@@ -1,18 +1,18 @@
 // Generazione testo per il "tema" di italiano e per l'assistente di
 // matematica. Script classico: espone tutto su window.Schola.
 //
-// Motore principale: Groq (https://console.groq.com), con la chiave gratuita
-// impostata in js/config.js — veloce e affidabile, livello gratuito generoso.
+// Motore principale: Groq, chiamato attraverso un Worker Cloudflare "proxy"
+// (vedi cloudflare-worker/groq-proxy.js) che tiene la chiave API nascosta
+// lato server — non e' mai presente nel codice del sito, quindi ne' GitHub
+// ne' un visitatore che ispeziona la pagina possono vederla. L'URL del
+// Worker e' impostato in js/config.js (quello NON e' un segreto).
 // Riserva: Pollinations AI (https://pollinations.ai), gratuita e senza
-// chiave, usata solo se Groq non risponde (es. chiave non configurata,
-// esaurita o servizio momentaneamente giu').
+// chiave, usata se il Worker non e' configurato o non risponde.
 (function () {
 
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'openai/gpt-oss-120b';
 const POLLINATIONS_URL = 'https://text.pollinations.ai/openai';
 
-const GROQ_ATTEMPTS = 2;
+const PROXY_ATTEMPTS = 2;
 const RETRY_DELAY_MS = 1200;
 
 function wait(ms) {
@@ -61,13 +61,8 @@ async function requestChat(url, body, headers) {
   return cleanFormatting(content.trim());
 }
 
-function requestGroq(messages, seed) {
-  const apiKey = window.Schola.GROQ_API_KEY;
-  return requestChat(
-    GROQ_URL,
-    { model: GROQ_MODEL, messages, seed },
-    { Authorization: `Bearer ${apiKey}` }
-  );
+function requestProxy(messages, seed) {
+  return requestChat(window.Schola.AI_PROXY_URL, { messages, seed });
 }
 
 function requestPollinations(messages, seed) {
@@ -82,18 +77,17 @@ function requestPollinations(messages, seed) {
  */
 async function chatComplete(messages, { seed, onStatus } = {}) {
   const fixedSeed = seed ?? Math.floor(Math.random() * 1e9);
-  const hasGroqKey = !!window.Schola.GROQ_API_KEY;
+  const hasProxy = !!window.Schola.AI_PROXY_URL;
   let lastError = null;
 
-  if (hasGroqKey) {
-    for (let attempt = 1; attempt <= GROQ_ATTEMPTS; attempt++) {
+  if (hasProxy) {
+    for (let attempt = 1; attempt <= PROXY_ATTEMPTS; attempt++) {
       try {
-        return await requestGroq(messages, fixedSeed);
+        return await requestProxy(messages, fixedSeed);
       } catch (err) {
         lastError = err;
-        if (err.status === 401) break; // chiave non valida: inutile riprovare
-        if (attempt < GROQ_ATTEMPTS) {
-          if (onStatus) onStatus(`Nuovo tentativo (${attempt + 1}/${GROQ_ATTEMPTS})…`);
+        if (attempt < PROXY_ATTEMPTS) {
+          if (onStatus) onStatus(`Nuovo tentativo (${attempt + 1}/${PROXY_ATTEMPTS})…`);
           await wait(RETRY_DELAY_MS);
         }
       }
@@ -107,9 +101,6 @@ async function chatComplete(messages, { seed, onStatus } = {}) {
     lastError = lastError || err;
   }
 
-  if (lastError?.status === 401) {
-    throw new Error('La chiave AI configurata non è valida: controllala in js/config.js.');
-  }
   throw new Error('I servizi AI gratuiti non sono raggiungibili in questo momento. Riprova tra poco.');
 }
 
