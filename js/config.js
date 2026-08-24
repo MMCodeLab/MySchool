@@ -10,4 +10,4 @@
 // Finche' il Worker non e' pubblicato, lascia questo valore vuoto ('') o
 // null: la app userà comunque Pollinations AI come riserva gratuita.
 window.Schola = window.Schola || {};
-window.Schola.AI_PROXY_URL = '';
+window.Schola.AI_PROXY_URL = 'https://myschool-groq-proxy.minnitijunior.workers.dev/';
