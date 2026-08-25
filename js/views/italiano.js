@@ -101,7 +101,7 @@ function render(container) {
     <h2 class="task-group-title" style="margin-top:24px">Temi generati</h2>
     <div id="essays-list">
       ${essays.length ? essays.map(essayCardHtml).join('') : `
-        <div class="empty-state glass">
+        <div class="empty-state empty-state-sm glass">
           <div class="empty-emoji">✍️</div>
           <div class="empty-title">Nessun tema ancora</div>
           <div class="empty-text">I temi che generi appariranno qui, così puoi rileggerli quando vuoi.</div>
