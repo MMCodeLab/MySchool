@@ -124,7 +124,7 @@ function render(container) {
     <p class="section-subtitle">Cerca una persona, una città o un evento storico.</p>
 
     <div class="flex gap-2">
-      <input type="text" class="input" id="storia-search-input" placeholder="Es. Giulio Cesare, Venezia…" value="${escapeHtml(query)}" />
+      <input type="text" class="input" id="storia-search-input" inputmode="search" enterkeyhint="search" placeholder="Es. Giulio Cesare, Venezia…" value="${escapeHtml(query)}" />
       <button class="icon-btn" id="storia-search-btn" aria-label="Cerca">${icon('search')}</button>
     </div>
 

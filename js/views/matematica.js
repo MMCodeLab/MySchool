@@ -48,7 +48,7 @@ function renderFormulario(container) {
   container.innerHTML = `
     <div class="chip-row">${chips}</div>
     <div class="field">
-      <input type="text" class="input" id="formula-search-input" placeholder="Cerca una formula…" value="${escapeHtml(formulaQuery)}" />
+      <input type="text" class="input" id="formula-search-input" inputmode="search" enterkeyhint="search" placeholder="Cerca una formula…" value="${escapeHtml(formulaQuery)}" />
     </div>
     <div id="formula-list">${formulaListHtml()}</div>
   `;
@@ -134,7 +134,7 @@ function renderAssistente(container) {
         <button class="btn btn-glass btn-sm mt-2" id="retry-chat-btn">${icon('refresh')} Riprova</button>
       ` : ''}
       <div class="chat-input-row">
-        <textarea class="textarea chat-input" id="chat-input" rows="1" placeholder="Es. Risolvi 2x + 5 = 13" ${chatLoading ? 'disabled' : ''}>${escapeHtml(chatDraft)}</textarea>
+        <textarea class="textarea chat-input" id="chat-input" rows="1" enterkeyhint="send" placeholder="Es. Risolvi 2x + 5 = 13" ${chatLoading ? 'disabled' : ''}>${escapeHtml(chatDraft)}</textarea>
         <button class="icon-btn chat-send-btn" id="chat-send-btn" aria-label="Invia" ${chatLoading ? 'disabled' : ''}>${icon('send')}</button>
       </div>
       ${messages.length ? `<button class="btn btn-glass btn-sm mt-2" id="clear-chat-btn">${icon('trash')} Svuota conversazione</button>` : ''}
