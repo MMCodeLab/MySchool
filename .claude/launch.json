@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["serve.py", "5501"],
       "port": 5501
+    },
+    {
+      "name": "schola-dev-2",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["serve.py", "5511"],
+      "port": 5511
     }
   ]
 }

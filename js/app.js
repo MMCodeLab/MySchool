@@ -64,6 +64,8 @@ document.querySelectorAll('.nav-icon').forEach((el) => {
 
 initRouter();
 
+if (window.Schola.checkDueReminders) window.Schola.checkDueReminders();
+
 // Il service worker richiede http/https: se la pagina e' aperta come file
 // locale (file://) semplicemente non si registra, senza errori bloccanti.
 const isLocalDev = ['localhost', '127.0.0.1'].includes(location.hostname);

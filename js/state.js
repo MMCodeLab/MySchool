@@ -18,8 +18,10 @@ function uid() {
 function defaultState() {
   return {
     theme: 'dark',
+    remindersEnabled: false,
     subjects: [],
     tasks: [],
+    grades: [],
     essays: [],
     mathChat: [],
     translations: [],
@@ -79,6 +81,12 @@ const store = {
     applyTheme();
   },
 
+  // ---- Promemoria scadenze ----
+  setRemindersEnabled(enabled) {
+    state.remindersEnabled = !!enabled;
+    save();
+  },
+
   // ---- Materie (subjects) ----
   addSubject(name) {
     const subject = {
@@ -136,6 +144,51 @@ const store = {
   deleteTask(id) {
     state.tasks = state.tasks.filter((t) => t.id !== id);
     save();
+  },
+
+  // ---- Voti ----
+  addGrade({ subjectId, value, weight, label, date }) {
+    const grade = {
+      id: uid(),
+      subjectId,
+      value: Number(value),
+      weight: weight && weight > 0 ? Number(weight) : 1,
+      label: (label || '').trim(),
+      date: date || null,
+      createdAt: Date.now(),
+    };
+    state.grades.push(grade);
+    save();
+    return grade;
+  },
+  updateGrade(id, patch) {
+    const g = state.grades.find((x) => x.id === id);
+    if (!g) return;
+    Object.assign(g, patch);
+    save();
+  },
+  deleteGrade(id) {
+    state.grades = state.grades.filter((g) => g.id !== id);
+    save();
+  },
+  getGradesBySubject(subjectId) {
+    return state.grades.filter((g) => g.subjectId === subjectId);
+  },
+  // media ponderata dei voti di una materia (pesati per l'importanza della verifica)
+  getSubjectAverage(subjectId) {
+    const grades = store.getGradesBySubject(subjectId);
+    if (!grades.length) return null;
+    const totalWeight = grades.reduce((sum, g) => sum + g.weight, 0);
+    const weightedSum = grades.reduce((sum, g) => sum + g.value * g.weight, 0);
+    return totalWeight ? weightedSum / totalWeight : null;
+  },
+  // media generale: media delle medie di materia (ogni materia pesa uguale,
+  // cosi' una materia con tanti voti non "schiaccia" le altre)
+  getOverallAverage() {
+    const withGrades = state.subjects.filter((s) => store.getGradesBySubject(s.id).length);
+    if (!withGrades.length) return null;
+    const sum = withGrades.reduce((acc, s) => acc + store.getSubjectAverage(s.id), 0);
+    return sum / withGrades.length;
   },
 
   // ---- Temi di italiano ----

@@ -51,6 +51,9 @@ function route() {
   } else if (parts[0] === 'storia') {
     routeKey = 'storia';
     renderFn = views.storia.render;
+  } else if (parts[0] === 'voti') {
+    routeKey = 'voti';
+    renderFn = views.voti.render;
   } else if (parts[0] === 'impostazioni') {
     routeKey = 'impostazioni';
     renderFn = views.settings.render;

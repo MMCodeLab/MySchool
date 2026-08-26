@@ -696,6 +696,65 @@ a { color: inherit; text-decoration: none; }
 
 .exercise-row-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
 
+/* ---------- Voti ---------- */
+.grade-pass { color: var(--accent-a); }
+.grade-warn { color: var(--accent-b); }
+.grade-fail { color: var(--danger); }
+
+.trend-chart-wrap { margin: var(--space-3) 0; }
+.trend-chart-svg { width: 100%; height: auto; display: block; overflow: visible; }
+.trend-zone-pass { fill: var(--accent-a); opacity: 0.1; }
+.trend-zone-warn { fill: var(--accent-b); opacity: 0.1; }
+.trend-zone-fail { fill: var(--danger); opacity: 0.1; }
+.trend-line-path { fill: none; stroke: var(--text-secondary); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.trend-dot { stroke: var(--bg); stroke-width: 2; }
+.trend-dot.grade-pass { fill: var(--accent-a); }
+.trend-dot.grade-warn { fill: var(--accent-b); }
+.trend-dot.grade-fail { fill: var(--danger); }
+.trend-empty-hint { font-size: 0.82rem; text-align: center; padding: var(--space-3) 0; margin: 0; }
+
+.overall-average-card {
+  text-align: center;
+  padding: var(--space-5) var(--space-4);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-4);
+}
+.overall-average-label { font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; }
+.overall-average-value {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  font-weight: 800;
+  line-height: 1.15;
+  margin: 4px 0 var(--space-3);
+}
+.overall-average-value.grade-pass, .overall-average-value.grade-fail { color: inherit; }
+
+.subject-grades-card { margin-bottom: var(--space-4); }
+.subject-grades-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2) 4px;
+}
+.subject-grades-name { font-family: var(--font-display); font-weight: 700; font-size: 1rem; flex: 1; }
+.subject-grades-avg { font-family: var(--font-display); font-weight: 800; font-size: 1.15rem; }
+
+.grade-rows { display: flex; flex-direction: column; gap: var(--space-2); }
+.grade-empty-hint { font-size: 0.85rem; margin: 0 0 0 4px; }
+
+.grade-row { display: flex; align-items: center; gap: var(--space-3); }
+.grade-row-value {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.1rem;
+  width: 48px;
+  flex-shrink: 0;
+  text-align: center;
+}
+.grade-row-mid { flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.grade-row-meta { font-size: 0.85rem; color: var(--text-secondary); }
+.grade-weight-badge { font-size: 0.68rem; padding: 2px 8px; }
+
 .settings-row-toggle {
   display: flex;
   align-items: center;

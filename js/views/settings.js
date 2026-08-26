@@ -71,6 +71,21 @@ function openContactModal() {
   });
 }
 
+function remindersStatus() {
+  const { remindersEnabled } = store.get();
+  if (!('Notification' in window)) return 'unsupported';
+  if (Notification.permission === 'denied') return 'denied';
+  if (Notification.permission === 'granted' && remindersEnabled) return 'on';
+  return 'off';
+}
+
+const REMINDERS_COPY = {
+  unsupported: { title: 'Non disponibili', desc: 'Il tuo browser non supporta le notifiche.' },
+  denied: { title: 'Bloccati dal browser', desc: 'Hai bloccato le notifiche per questo sito: riattivale dalle impostazioni del browser per usarle.' },
+  on: { title: 'Attivi', desc: 'Ti avviso quando apri l\'app se hai una scadenza oggi o in ritardo. Tocca per disattivare.' },
+  off: { title: 'Disattivati', desc: 'Ti avviso quando apri l\'app se hai una scadenza oggi o in ritardo. Tocca per attivare.' },
+};
+
 function download(filename, text) {
   const blob = new Blob([text], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -103,6 +118,16 @@ function render(container) {
         <span class="segmented-thumb"></span>
         <span class="segmented-opt ${theme === 'dark' ? 'active' : ''}" data-theme-opt="dark">${icon('moon')} Scuro</span>
         <span class="segmented-opt ${theme === 'light' ? 'active' : ''}" data-theme-opt="light">${icon('sun')} Chiaro</span>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>Promemoria</h3>
+      <div class="settings-row glass" id="reminders-row" style="cursor:pointer">
+        <div class="settings-row-text">
+          <div class="settings-row-title">Promemoria scadenze — ${REMINDERS_COPY[remindersStatus()].title}</div>
+          <div class="settings-row-desc">${REMINDERS_COPY[remindersStatus()].desc}</div>
+        </div>
       </div>
     </div>
 
@@ -186,6 +211,35 @@ function render(container) {
   });
 
   container.querySelector('#contact-row').addEventListener('click', openContactModal);
+
+  container.querySelector('#reminders-row').addEventListener('click', async () => {
+    const status = remindersStatus();
+    if (status === 'unsupported' || status === 'denied') return;
+
+    if (status === 'on') {
+      store.setRemindersEnabled(false);
+      render(container);
+      return;
+    }
+
+    if (Notification.permission === 'granted') {
+      store.setRemindersEnabled(true);
+      showToast('Promemoria attivati');
+      if (window.Schola.checkDueReminders) window.Schola.checkDueReminders();
+      render(container);
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      store.setRemindersEnabled(true);
+      showToast('Promemoria attivati');
+      if (window.Schola.checkDueReminders) window.Schola.checkDueReminders();
+    } else {
+      showToast('Permesso negato: non posso avvisarti');
+    }
+    render(container);
+  });
 
   container.querySelector('#export-row').addEventListener('click', () => {
     const json = store.exportData();
