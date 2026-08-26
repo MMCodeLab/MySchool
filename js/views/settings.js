@@ -152,7 +152,7 @@ function render(container) {
       <div class="settings-row glass">
         <div class="settings-row-text">
           <div class="settings-row-title">Sezione Storia</div>
-          <div class="settings-row-desc">Le informazioni provengono da Wikipedia in italiano, mostrate in una card scorrevole dentro l'app.</div>
+          <div class="settings-row-desc">Generata con la stessa AI usata per temi e matematica (Groq, con Pollinations come riserva). Le risposte possono contenere imprecisioni: controlla sempre quello che leggi.</div>
         </div>
       </div>
       <div class="settings-row glass">

@@ -1,43 +1,62 @@
 // Script classico (non un modulo ES): espone tutto su window.Schola.views.storia.
-// Sezione "Storia": cerca una persona, una città o un luogo e mostra le
-// informazioni da Wikipedia (API pubblica, nessuna chiave richiesta).
+// Sezione "Storia": cerca una persona, una citta' o un evento storico usando
+// la stessa AI gia' usata per i temi di italiano e l'assistente di
+// matematica (vedi js/api/ai-text.js), invece di Wikipedia. La ricerca e'
+// mostrata come una rotta su una mappa antica: le linee tratteggiate "corrono"
+// verso una X finche' non arriva la risposta, poi la X si accende e si puo'
+// toccare per aprire la scheda con i risultati.
 (function () {
 
-const { store, icon, escapeHtml, showToast, confirmAction, openModal, searchHistoryTopic } = window.Schola;
+const { store, icon, escapeHtml, showToast, confirmAction, openModal, searchHistoryWithAI } = window.Schola;
 
 let query = '';
-let loading = false;
-let errorMsg = null;
-let result = null; // { query, title, description, extract, imageUrl, pageUrl }
+let mapState = 'idle'; // 'idle' | 'loading' | 'found' | 'error'
+let statusText = 'Scrivi un nome e premi cerca per tracciare la rotta.';
+let result = null; // { query, title, description, extract }
 
-function truncate(text, maxLen) {
-  if (text.length <= maxLen) return text;
-  return text.slice(0, maxLen).replace(/\s+\S*$/, '') + '…';
-}
+const COMPASS_SVG = `
+  <svg viewBox="0 0 60 60" class="map-compass" aria-hidden="true">
+    <circle cx="30" cy="30" r="26" />
+    <path d="M30 6v10M30 44v10M6 30h10M44 30h10" />
+    <path d="M30 12 34 30 30 48 26 30Z" />
+  </svg>
+`;
 
-// La scheda mostra solo un'anteprima: il tap apre una card a tutto schermo,
-// scorrevole, con tutte le informazioni — invece di portare l'utente fuori
-// dall'app direttamente su Wikipedia.
-function resultCardHtml(r) {
+function mapRouteHtml() {
   return `
-    <div class="card glass storia-result-card" data-open-storia-detail>
-      ${r.imageUrl ? `<img src="${escapeHtml(r.imageUrl)}" alt="" class="storia-image" />` : ''}
-      <span class="day-card-title">${escapeHtml(r.title)}</span>
-      ${r.description ? `<span class="day-card-meta storia-description">${escapeHtml(r.description)}</span>` : ''}
-      <p class="storia-extract">${escapeHtml(truncate(r.extract, 200))}</p>
-      <span class="storia-readmore">Leggi tutto ${icon('chevronDown')}</span>
+    <div class="map-route map-route-${mapState}" id="map-route">
+      ${COMPASS_SVG}
+      <svg viewBox="0 0 320 70" class="map-route-svg" preserveAspectRatio="none">
+        <path class="map-route-path" d="M14,35 C 80,8 110,62 160,35 S 250,8 300,35" />
+        <circle class="map-route-start" cx="14" cy="35" r="6"></circle>
+        <g class="map-route-x-pos" transform="translate(300,35)">
+          <g class="map-route-x-scale" id="map-route-x">
+            <circle class="map-route-x-ring" r="15"></circle>
+            <path class="map-route-x-mark" d="M-8,-8 9,9M9,-8 -8,9"></path>
+          </g>
+        </g>
+      </svg>
+      <p class="map-route-caption" id="map-route-caption">${escapeHtml(statusText)}</p>
     </div>
   `;
 }
 
-function openStoriaDetail(r) {
+function setMapState(container, state, caption) {
+  mapState = state;
+  statusText = caption;
+  const routeEl = container.querySelector('#map-route');
+  if (!routeEl) return;
+  routeEl.className = `map-route map-route-${mapState}`;
+  container.querySelector('#map-route-caption').textContent = statusText;
+}
+
+function openResultDetail(r) {
   openModal({
     title: r.title,
     bodyHtml: `
-      ${r.imageUrl ? `<img src="${escapeHtml(r.imageUrl)}" alt="" class="storia-image" />` : ''}
       ${r.description ? `<p class="storia-description">${escapeHtml(r.description)}</p>` : ''}
       <p class="storia-extract">${escapeHtml(r.extract)}</p>
-      <p class="storia-source">Fonte: Wikipedia — <a href="${escapeHtml(r.pageUrl)}" target="_blank" rel="noopener">apri la voce originale ↗</a></p>
+      <p class="storia-source">Generato con intelligenza artificiale: le informazioni possono contenere imprecisioni, verifica sempre quello che leggi.</p>
     `,
   });
 }
@@ -46,46 +65,18 @@ function historyChipHtml(item) {
   return `<span class="chip" data-history-query="${escapeHtml(item.query)}">${escapeHtml(item.title || item.query)}</span>`;
 }
 
-function renderResult(container) {
-  const resultEl = container.querySelector('#storia-result');
-  if (!resultEl) return;
-  if (loading) {
-    resultEl.innerHTML = `<p class="text-secondary">Ricerca in corso…</p>`;
-  } else if (errorMsg) {
-    resultEl.innerHTML = `<p class="form-error">${escapeHtml(errorMsg)}</p>`;
-  } else if (result) {
-    resultEl.innerHTML = resultCardHtml(result);
-    resultEl.querySelector('[data-open-storia-detail]').addEventListener('click', () => openStoriaDetail(result));
-  } else {
-    resultEl.innerHTML = `
-      <div class="empty-state glass">
-        <div class="empty-emoji">🏛️</div>
-        <div class="empty-title">Cerca un nome</div>
-        <div class="empty-text">Prova con una persona storica, una città o un evento: es. "Napoleone Bonaparte" o "Roma".</div>
-      </div>
-    `;
-  }
-}
-
 async function runSearch(container, term) {
-  loading = true;
-  errorMsg = null;
-  renderResult(container);
+  result = null;
+  setMapState(container, 'loading', 'Sto tracciando la rotta…');
+
   try {
-    const found = await searchHistoryTopic(term);
-    if (!found) {
-      errorMsg = `Nessun risultato per "${term}".`;
-      result = null;
-    } else {
-      result = { query: term, ...found };
-      store.addStoriaSearch(result);
-    }
-  } catch (err) {
-    errorMsg = err.message || 'Ricerca non riuscita, riprova.';
-  } finally {
-    loading = false;
-    renderResult(container);
+    const found = await searchHistoryWithAI(term);
+    result = { query: term, ...found };
+    store.addStoriaSearch(result);
+    setMapState(container, 'found', 'Trovato! Tocca la X per leggere.');
     renderHistory(container);
+  } catch (err) {
+    setMapState(container, 'error', err.message || 'Ricerca non riuscita, riprova.');
   }
 }
 
@@ -101,15 +92,12 @@ function renderHistory(container) {
       const term = chip.dataset.historyQuery;
       const { storiaSearches: current } = store.get();
       const cached = current.find((s) => s.query.toLowerCase() === term.toLowerCase());
+      query = term;
+      container.querySelector('#storia-search-input').value = term;
       if (cached) {
         result = cached;
-        errorMsg = null;
-        query = term;
-        container.querySelector('#storia-search-input').value = term;
-        renderResult(container);
+        setMapState(container, 'found', 'Trovato! Tocca la X per leggere.');
       } else {
-        query = term;
-        container.querySelector('#storia-search-input').value = term;
         runSearch(container, term);
       }
     });
@@ -123,12 +111,13 @@ function render(container) {
     <h1 class="section-title">Storia</h1>
     <p class="section-subtitle">Cerca una persona, una città o un evento storico.</p>
 
-    <div class="flex gap-2">
-      <input type="text" class="input" id="storia-search-input" inputmode="search" enterkeyhint="search" placeholder="Es. Giulio Cesare, Venezia…" value="${escapeHtml(query)}" />
-      <button class="icon-btn" id="storia-search-btn" aria-label="Cerca">${icon('search')}</button>
+    <div class="card glass map-search-card">
+      <div class="flex gap-2">
+        <input type="text" class="input map-search-input" id="storia-search-input" inputmode="search" enterkeyhint="search" placeholder="Es. Giulio Cesare, Venezia…" value="${escapeHtml(query)}" />
+        <button class="icon-btn map-search-btn" id="storia-search-btn" aria-label="Cerca">${icon('search')}</button>
+      </div>
+      ${mapRouteHtml()}
     </div>
-
-    <div id="storia-result" style="margin-top:16px"></div>
 
     ${storiaSearches.length ? `
       <h2 class="task-group-title" style="margin-top:24px">Ricerche recenti</h2>
@@ -137,7 +126,6 @@ function render(container) {
     ` : '<div id="storia-history"></div>'}
   `;
 
-  renderResult(container);
   renderHistory(container);
 
   const input = container.querySelector('#storia-search-input');
@@ -150,6 +138,10 @@ function render(container) {
 
   container.querySelector('#storia-search-btn').addEventListener('click', doSearch);
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
+
+  container.querySelector('#map-route-x').addEventListener('click', () => {
+    if (mapState === 'found' && result) openResultDetail(result);
+  });
 
   const clearBtn = container.querySelector('#clear-storia-history-btn');
   if (clearBtn) clearBtn.addEventListener('click', () => {

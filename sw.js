@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'schola-v3';
+const CACHE_VERSION = 'schola-v4';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -15,7 +15,6 @@ const SHELL_ASSETS = [
   'js/router.js',
   'js/api/ai-text.js',
   'js/api/translate.js',
-  'js/api/wikipedia.js',
   'js/api/ocr.js',
   'js/views/studio.js',
   'js/views/italiano.js',

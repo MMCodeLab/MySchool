@@ -1,5 +1,5 @@
-// Generazione testo per il "tema" di italiano e per l'assistente di
-// matematica. Script classico: espone tutto su window.Schola.
+// Generazione testo per il "tema" di italiano, l'assistente di matematica e
+// la ricerca di storia. Script classico: espone tutto su window.Schola.
 //
 // Motore principale: Groq, chiamato attraverso un Worker Cloudflare "proxy"
 // (vedi cloudflare-worker/groq-proxy.js) che tiene la chiave API nascosta
@@ -58,7 +58,7 @@ async function requestChat(url, body, headers) {
   const data = await res.json();
   const content = data?.choices?.[0]?.message?.content;
   if (!content) throw new Error('Risposta AI vuota o non valida.');
-  return cleanFormatting(content.trim());
+  return content.trim();
 }
 
 function requestProxy(messages, seed) {
@@ -115,7 +115,8 @@ async function generateEssay(topic, options) {
     },
     { role: 'user', content: `Scrivi un tema svolto sul seguente argomento: "${topic}"` },
   ];
-  return chatComplete(messages, options);
+  const raw = await chatComplete(messages, options);
+  return cleanFormatting(raw);
 }
 
 /**
@@ -126,10 +127,55 @@ const MATH_SYSTEM_PROMPT = 'Sei un tutor di matematica paziente per studenti del
 
 async function askMathTutor(history, options) {
   const messages = [{ role: 'system', content: MATH_SYSTEM_PROMPT }, ...history];
-  return chatComplete(messages, options);
+  const raw = await chatComplete(messages, options);
+  return cleanFormatting(raw);
+}
+
+/**
+ * Messaggio di sistema per la ricerca di storia: chiede all'AI di rispondere
+ * con un JSON strutturato (titolo, sottotitolo, testo) invece di un unico
+ * blocco di testo, cosi' la scheda risultato puo' mostrarli separatamente
+ * come faceva prima con Wikipedia.
+ */
+const HISTORY_SYSTEM_PROMPT = 'Sei un assistente di storia e geografia per studenti delle scuole superiori. Ti viene dato il nome di una persona storica, una citta\', un luogo o un evento: rispondi SOLO con un oggetto JSON valido, senza testo prima o dopo e senza blocchi di codice markdown, con esattamente questa struttura: {"title": "nome completo o ufficiale", "description": "una riga brevissima, come un sottotitolo (professione, periodo o cosa rappresenta)", "extract": "3-5 frasi in italiano corretto e scorrevole con le informazioni principali, in prosa, senza elenchi puntati ne\' markdown"}. Se non riconosci l\'argomento con certezza, rispondi comunque con le informazioni piu\' plausibili che conosci, senza inventare un JSON vuoto.';
+
+function extractJson(raw) {
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced ? fenced[1] : raw;
+  const start = candidate.indexOf('{');
+  const end = candidate.lastIndexOf('}');
+  if (start === -1 || end === -1 || end < start) throw new Error('Nessun JSON trovato nella risposta.');
+  return JSON.parse(candidate.slice(start, end + 1));
+}
+
+/**
+ * Cerca informazioni storiche/geografiche tramite l'AI (stesso motore usato
+ * per temi e matematica), al posto di Wikipedia.
+ */
+async function searchHistoryWithAI(query, options) {
+  const messages = [
+    { role: 'system', content: HISTORY_SYSTEM_PROMPT },
+    { role: 'user', content: query },
+  ];
+  const raw = await chatComplete(messages, options);
+
+  let data;
+  try {
+    data = extractJson(raw);
+  } catch (e) {
+    // Il modello non ha rispettato il formato: mostriamo comunque il testo
+    // grezzo come descrizione, invece di far fallire tutta la ricerca.
+    data = { title: query, description: null, extract: raw };
+  }
+
+  const title = cleanFormatting(String(data.title || query).trim());
+  const description = data.description ? cleanFormatting(String(data.description).trim()) : null;
+  const extract = cleanFormatting(String(data.extract || '').trim()) || 'Nessuna informazione disponibile per questo argomento.';
+
+  return { title, description, extract };
 }
 
 window.Schola = window.Schola || {};
-Object.assign(window.Schola, { generateEssay, askMathTutor });
+Object.assign(window.Schola, { generateEssay, askMathTutor, searchHistoryWithAI });
 
 })();
