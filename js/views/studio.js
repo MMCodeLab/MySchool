@@ -2,7 +2,7 @@
 // Sezione "Organizza lo studio": materie e compiti/scadenze.
 (function () {
 
-const { store, icon, escapeHtml, openModal, closeModal, showToast, confirmAction } = window.Schola;
+const { store, icon, escapeHtml, openModal, closeModal, showToast, confirmAction, WEEK_DAYS, weekDayKey, weekDay, navigate } = window.Schola;
 
 let activeFilter = null; // id materia, o null = tutte
 let showDone = false;
@@ -201,6 +201,116 @@ function openManageSubjectsModal() {
   });
 }
 
+
+// ---------- Orario delle lezioni ----------
+//
+// Si apre sempre sul giorno di oggi; le pastiglie sopra la griglia servono a
+// sbirciare gli altri giorni (domani, soprattutto) senza perdere il posto:
+// cambiando pastiglia si ridisegna solo questa scheda, non tutta la pagina.
+
+let timetableDay = null;
+// Data in cui e' stato scelto: se nel frattempo e' cambiato il giorno, la
+// scelta di ieri non vale piu' e si riparte da oggi. Senza questo, "domani"
+// scelto ieri sera stamattina indicherebbe il giorno sbagliato.
+let timetableDayStamp = null;
+
+function resetTimetableDayIfStale() {
+  const today = new Date().toDateString();
+  if (timetableDayStamp !== today) {
+    timetableDay = null;
+    timetableDayStamp = today;
+  }
+}
+
+function todayKey() {
+  return weekDayKey(new Date());
+}
+
+function tomorrowKey() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return weekDayKey(d);
+}
+
+// "Oggi", "Domani" o il nome del giorno: dice sempre cosa si sta guardando.
+function dayCaption(key) {
+  if (key === todayKey()) return 'Oggi';
+  if (key === tomorrowKey()) return 'Domani';
+  return weekDay(key).label;
+}
+
+function timetableRowsHtml(dayKey) {
+  const schedule = store.getDaySchedule(dayKey);
+
+  if (!schedule.length) {
+    return `<p class="timetable-free">Nessuna lezione ${dayKey === 'dom' ? 'di domenica' : 'questo giorno'}.</p>`;
+  }
+
+  return `<div class="timetable-rows">${schedule.map((slot) => `
+    <div class="timetable-row${slot.subject ? '' : ' is-free'}">
+      <span class="timetable-hour">${slot.hour}ª</span>
+      ${slot.subject
+        ? `<span class="timetable-dot" style="background:${slot.subject.color}"></span>
+           <span class="timetable-subject">${escapeHtml(slot.subject.name)}</span>`
+        : '<span class="timetable-subject">Ora buca</span>'}
+    </div>
+  `).join('')}</div>`;
+}
+
+function timetableCardHtml() {
+  const dayKey = timetableDay || todayKey();
+
+  if (!store.hasTimetable()) {
+    return `
+      <div class="card glass timetable-card">
+        <div class="timetable-head">
+          <span class="timetable-title">Orario delle lezioni</span>
+        </div>
+        <p class="timetable-empty">Compila l'orario dalle Impostazioni: qui vedrai le materie di oggi, e potrai sbirciare quelle di domani.</p>
+        <button class="btn btn-glass btn-block" id="timetable-setup">Vai alle Impostazioni</button>
+      </div>
+    `;
+  }
+
+  const chips = WEEK_DAYS.map((d) => `
+    <span class="chip timetable-chip ${d.key === dayKey ? 'selected' : ''}" data-day="${d.key}"
+      ${d.key === dayKey ? 'style="background:var(--accent-gradient);border-color:transparent"' : ''}>${d.short}</span>
+  `).join('');
+
+  return `
+    <div class="card glass timetable-card">
+      <div class="timetable-head">
+        <span class="timetable-title">Orario</span>
+        <span class="timetable-day">${escapeHtml(dayCaption(dayKey))}${dayCaption(dayKey) !== weekDay(dayKey).label ? ` · ${escapeHtml(weekDay(dayKey).label)}` : ''}</span>
+      </div>
+      <div class="chip-row timetable-days">${chips}</div>
+      <div id="timetable-body">${timetableRowsHtml(dayKey)}</div>
+    </div>
+  `;
+}
+
+function wireTimetable(container) {
+  const setupBtn = container.querySelector('#timetable-setup');
+  if (setupBtn) setupBtn.addEventListener('click', () => navigate('#/impostazioni'));
+
+  container.querySelectorAll('[data-day]').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      timetableDay = chip.dataset.day;
+      timetableDayStamp = new Date().toDateString();
+      container.querySelector('#timetable-body').innerHTML = timetableRowsHtml(timetableDay);
+      container.querySelectorAll('.timetable-chip').forEach((c) => {
+        const on = c.dataset.day === timetableDay;
+        c.classList.toggle('selected', on);
+        c.setAttribute('style', on ? 'background:var(--accent-gradient);border-color:transparent' : '');
+      });
+      const label = container.querySelector('.timetable-day');
+      const caption = dayCaption(timetableDay);
+      const full = weekDay(timetableDay).label;
+      if (label) label.textContent = caption === full ? caption : `${caption} · ${full}`;
+    });
+  });
+}
+
 function render(container) {
   const { subjects, tasks } = store.get();
 
@@ -248,9 +358,12 @@ function render(container) {
     </div>
   `;
 
+  resetTimetableDayIfStale();
+
   container.innerHTML = `
     <h1 class="section-title">Organizza lo studio</h1>
     <p class="section-subtitle">Materie, compiti e scadenze in un unico posto.</p>
+    ${timetableCardHtml()}
     ${chipsHtml}
     <div id="tasks-list">${pending.length ? pendingHtml : (done.length ? '' : emptyHtml)}</div>
     ${done.length ? `
@@ -262,6 +375,8 @@ function render(container) {
     ` : ''}
     <button class="fab" id="fab-add-task" aria-label="Nuova attività">${icon('plus')}</button>
   `;
+
+  wireTimetable(container);
 
   container.querySelector('#fab-add-task').addEventListener('click', () => openTaskModal(null));
   const emptyBtn = container.querySelector('#empty-add-task');

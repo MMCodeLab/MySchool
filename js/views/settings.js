@@ -1,7 +1,7 @@
 // Script classico (non un modulo ES): espone tutto su window.Schola.views.settings.
 (function () {
 
-const { store, icon, escapeHtml, showToast, openModal, closeModal } = window.Schola;
+const { store, icon, escapeHtml, showToast, openModal, closeModal , WEEK_DAYS, weekDay, navigate } = window.Schola;
 
 // Il guscio comune tiene la data dell'ultimo backup: se per qualche motivo non
 // e' stato caricato, la riga mostra semplicemente il testo predefinito.
@@ -108,6 +108,110 @@ function download(filename, text) {
   URL.revokeObjectURL(url);
 }
 
+
+// ---------- Orario delle lezioni ----------
+//
+// Una riga per giorno; toccandola si apre la finestra dove si scelgono le
+// materie ora per ora. Le materie sono quelle create in Studio: qui si
+// scelgono soltanto, non si inventano, cosi' l'orario resta legato ai colori
+// e ai voti di quelle stesse materie.
+
+function daySummary(dayKey) {
+  const schedule = store.getDaySchedule(dayKey);
+  if (!schedule.length) return 'Nessuna lezione';
+  const names = schedule.filter((s) => s.subject).map((s) => s.subject.name);
+  if (!names.length) return `${schedule.length} ore, nessuna materia scelta`;
+  const shown = names.slice(0, 3).join(', ');
+  return `${schedule.length} ore · ${shown}${names.length > 3 ? '…' : ''}`;
+}
+
+function timetableDayRowsHtml(dayKey) {
+  const { subjects } = store.get();
+  const schedule = store.getDaySchedule(dayKey);
+
+  if (!schedule.length) {
+    return '<p class="text-secondary" style="margin:0 0 12px">Nessuna ora. Aggiungi la prima qui sotto.</p>';
+  }
+
+  return schedule.map((slot, i) => `
+    <div class="hour-row">
+      <span class="hour-label">${slot.hour}ª ora</span>
+      <select class="input hour-select" data-hour="${i}">
+        <option value="">Ora buca</option>
+        ${subjects.map((s) => `
+          <option value="${s.id}" ${slot.subject && slot.subject.id === s.id ? 'selected' : ''}>${escapeHtml(s.name)}</option>
+        `).join('')}
+      </select>
+      <button class="icon-btn danger" data-remove-hour="${i}" aria-label="Togli la ${slot.hour}ª ora">${icon('trash')}</button>
+    </div>
+  `).join('');
+}
+
+// onChange ridisegna la schermata sotto: le righe dei giorni mostrano un
+// riassunto ("5 ore · Italiano, Matematica...") che va tenuto aggiornato.
+function openTimetableDayModal(dayKey, onChange) {
+  const { subjects } = store.get();
+  const day = weekDay(dayKey);
+
+  const body = () => `
+    ${subjects.length ? '' : `
+      <p class="form-error" style="display:block">Non hai ancora nessuna materia. Creale da "Studio" e poi torna qui.</p>
+    `}
+    <div id="hours-list">${timetableDayRowsHtml(dayKey)}</div>
+    <button class="btn btn-glass btn-block" id="add-hour">${icon('plus')} Aggiungi un'ora</button>
+  `;
+
+  openModal({
+    title: day.label,
+    bodyHtml: body(),
+    onMount: (root) => {
+      const wire = () => {
+        root.querySelector('#hours-list').innerHTML = timetableDayRowsHtml(dayKey);
+
+        root.querySelectorAll('[data-hour]').forEach((select) => {
+          select.addEventListener('change', () => {
+            store.setTimetableHour(dayKey, Number(select.dataset.hour), select.value || null);
+            if (onChange) onChange();
+          });
+        });
+
+        root.querySelectorAll('[data-remove-hour]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            store.removeTimetableHour(dayKey, Number(btn.dataset.removeHour));
+            wire();
+            if (onChange) onChange();
+          });
+        });
+      };
+
+      root.querySelector('#add-hour').addEventListener('click', () => {
+        store.addTimetableHour(dayKey);
+        wire();
+        if (onChange) onChange();
+      });
+
+      wire();
+    },
+  });
+}
+
+function timetableSectionHtml() {
+  return `
+    <div class="settings-section">
+      <h3>Orario delle lezioni</h3>
+      <p class="settings-section-hint">Le materie di ogni ora, giorno per giorno. In "Studio" trovi sempre in cima quelle di oggi, e con un tocco quelle di domani.</p>
+      ${WEEK_DAYS.map((d) => `
+        <div class="settings-row glass" data-timetable-day="${d.key}" style="cursor:pointer">
+          <div class="settings-row-text">
+            <div class="settings-row-title">${escapeHtml(d.label)}</div>
+            <div class="settings-row-desc">${escapeHtml(daySummary(d.key))}</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
 function render(container) {
   const { theme } = store.get();
   const activeIndex = theme === 'dark' ? 0 : 1;
@@ -140,6 +244,8 @@ function render(container) {
         </div>
       </div>
     </div>
+
+    ${timetableSectionHtml()}
 
     <div class="settings-section">
       <h3>Dati</h3>
@@ -244,6 +350,10 @@ function render(container) {
       showToast('Permesso negato: non posso avvisarti');
     }
     render(container);
+  });
+
+  container.querySelectorAll('[data-timetable-day]').forEach((row) => {
+    row.addEventListener('click', () => openTimetableDayModal(row.dataset.timetableDay, () => render(container)));
   });
 
   container.querySelector('#export-row').addEventListener('click', () => {

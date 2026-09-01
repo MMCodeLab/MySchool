@@ -11,6 +11,46 @@ const SUBJECT_COLORS = [
   '#a855f7', '#06b6d4', '#f43f5e', '#14b8a6', '#84cc16',
 ];
 
+// L'orario e' organizzato per giorno della settimana. La domenica c'e' perche'
+// il sabato bisogna comunque poter guardare "cosa ho domani", anche solo per
+// vedere che non c'e' niente.
+const WEEK_DAYS = [
+  { key: 'lun', label: 'Lunedì',    short: 'Lun' },
+  { key: 'mar', label: 'Martedì',   short: 'Mar' },
+  { key: 'mer', label: 'Mercoledì', short: 'Mer' },
+  { key: 'gio', label: 'Giovedì',   short: 'Gio' },
+  { key: 'ven', label: 'Venerdì',   short: 'Ven' },
+  { key: 'sab', label: 'Sabato',    short: 'Sab' },
+  { key: 'dom', label: 'Domenica',  short: 'Dom' },
+];
+
+// getDay() conta da domenica: qui la settimana comincia di lunedi', come a scuola.
+function weekDayKey(date) {
+  return WEEK_DAYS[(date.getDay() + 6) % 7].key;
+}
+
+function weekDay(key) {
+  return WEEK_DAYS.find((d) => d.key === key) || WEEK_DAYS[0];
+}
+
+function emptyTimetable() {
+  const out = {};
+  WEEK_DAYS.forEach((d) => { out[d.key] = []; });
+  return out;
+}
+
+// Ogni giorno e' un elenco di ore, e ogni ora e' l'id di una materia (oppure
+// null per un'ora buca). L'ordine e' l'ora: la prima casella e' la prima ora.
+function normalizeTimetable(raw) {
+  const out = emptyTimetable();
+  if (!raw || typeof raw !== 'object') return out;
+  WEEK_DAYS.forEach((d) => {
+    const hours = raw[d.key];
+    if (Array.isArray(hours)) out[d.key] = hours.map((id) => id || null);
+  });
+  return out;
+}
+
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
@@ -20,6 +60,7 @@ function defaultState() {
     theme: 'dark',
     remindersEnabled: false,
     subjects: [],
+    timetable: emptyTimetable(),
     tasks: [],
     grades: [],
     essays: [],
@@ -34,7 +75,11 @@ function load() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultState();
     const parsed = JSON.parse(raw);
-    return { ...defaultState(), ...parsed };
+    const merged = { ...defaultState(), ...parsed };
+    // I dati salvati prima dell'orario non hanno il campo, e uno salvato a meta'
+    // potrebbe avere solo alcuni giorni: normalizeTimetable riempie i buchi.
+    merged.timetable = normalizeTimetable(merged.timetable);
+    return merged;
   } catch (e) {
     console.warn('Impossibile leggere i dati salvati, riparto da zero.', e);
     return defaultState();
@@ -112,6 +157,42 @@ const store = {
   },
   getSubject(id) {
     return state.subjects.find((s) => s.id === id) || null;
+  },
+
+  // ---- Orario delle lezioni ----
+  getTimetable() {
+    return state.timetable;
+  },
+  // Le ore di un giorno, gia' risolte in materie: le materie cancellate nel
+  // frattempo tornano come ore vuote invece che come id orfani.
+  getDaySchedule(dayKey) {
+    const hours = state.timetable[dayKey] || [];
+    return hours.map((subjectId, i) => ({
+      hour: i + 1,
+      subject: subjectId ? (state.subjects.find((s) => s.id === subjectId) || null) : null,
+    }));
+  },
+  setTimetableHour(dayKey, index, subjectId) {
+    const hours = state.timetable[dayKey];
+    if (!hours || index < 0 || index >= hours.length) return;
+    hours[index] = subjectId || null;
+    save();
+  },
+  addTimetableHour(dayKey) {
+    if (!state.timetable[dayKey]) return;
+    state.timetable[dayKey].push(null);
+    save();
+  },
+  removeTimetableHour(dayKey, index) {
+    const hours = state.timetable[dayKey];
+    if (!hours || index < 0 || index >= hours.length) return;
+    hours.splice(index, 1);
+    save();
+  },
+  // Vero solo se almeno un giorno ha almeno un'ora con una materia: serve a
+  // decidere se in Studio mostrare l'orario o l'invito a compilarlo.
+  hasTimetable() {
+    return WEEK_DAYS.some((d) => (state.timetable[d.key] || []).some((id) => id));
   },
 
   // ---- Compiti / attivita' di studio ----
@@ -271,6 +352,6 @@ const store = {
 };
 
 window.Schola = window.Schola || {};
-Object.assign(window.Schola, { store, SUBJECT_COLORS, uid, applyTheme });
+Object.assign(window.Schola, { store, WEEK_DAYS, weekDayKey, weekDay, SUBJECT_COLORS, uid, applyTheme });
 
 })();

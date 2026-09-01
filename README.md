@@ -18,7 +18,7 @@
 
 ## Funzionalità principali
 
-- **Studio**: panoramica e organizzazione delle attività di studio.
+- **Studio**: panoramica e organizzazione delle attività di studio, con in cima l'**orario delle lezioni** — le materie ora per ora, aperto sul giorno di oggi e con un tocco su quello di domani (si compila dalle Impostazioni).
 - **Italiano**: scrittura e correzione di temi, con assistente AI.
 - **Matematica**: esercizi e formulario di riferimento.
 - **Inglese**: traduzione ed esercizi di lingua.
