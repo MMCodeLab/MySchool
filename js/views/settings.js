@@ -3,6 +3,16 @@
 
 const { store, icon, escapeHtml, showToast, confirmAction, openModal, closeModal } = window.Schola;
 
+// Il guscio comune tiene la data dell'ultimo backup: se per qualche motivo non
+// e' stato caricato, la riga mostra semplicemente il testo predefinito.
+const shell = window.PwaShell || {
+  backupInfo: () => ({ never: true, overdue: false }),
+  backupLabel: () => 'Non hai mai esportato un backup',
+  markBackupDone: () => {},
+};
+const backupInfo = () => shell.backupInfo();
+const backupLabel = () => shell.backupLabel();
+
 const FORMSPREE_ENDPOINT = 'https://formspree.io/f/xykgbzya';
 const INSTAGRAM_URL = 'https://www.instagram.com/myproject_pwa?igsi=aTNwM3dpdWw1ZjU%3D&utm_source=qr';
 const GITHUB_URL = 'https://github.com/MMCodeLab';
@@ -137,6 +147,7 @@ function render(container) {
         <div class="settings-row-text">
           <div class="settings-row-title">Esporta backup</div>
           <div class="settings-row-desc">Scarica un file JSON con materie, compiti e cronologie.</div>
+          <div class="settings-row-desc"${backupInfo().overdue ? ' style="color:var(--warning);font-weight:600"' : ''}>${escapeHtml(backupLabel())}</div>
         </div>
       </div>
       <div class="settings-row glass" id="import-row" style="cursor:pointer">
@@ -245,7 +256,9 @@ function render(container) {
     const json = store.exportData();
     const date = new Date().toISOString().slice(0, 10);
     download(`schola-backup-${date}.json`, json);
+    shell.markBackupDone();
     showToast('Backup scaricato');
+    render(container);
   });
 
   const fileInput = container.querySelector('#import-file');

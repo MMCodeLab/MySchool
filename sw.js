@@ -1,4 +1,7 @@
-const CACHE_VERSION = 'schola-v4';
+// Alza questo numero a ogni pubblicazione: e' il cambiamento di questo file
+// che fa accorgere il browser che c'e' una versione nuova, e quindi fa
+// comparire l'avviso "Nuova versione disponibile" (vedi js/pwa-shell.js).
+const CACHE_VERSION = 'schola-v5';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -11,6 +14,8 @@ const SHELL_ASSETS = [
   'js/config.js',
   'js/state.js',
   'js/components.js',
+  'js/pwa-shell.js',
+  'js/reminders.js',
   'js/formulario-data.js',
   'js/router.js',
   'js/api/ai-text.js',
@@ -21,6 +26,7 @@ const SHELL_ASSETS = [
   'js/views/matematica.js',
   'js/views/inglese.js',
   'js/views/storia.js',
+  'js/views/voti.js',
   'js/views/settings.js',
   'icons/icon-192.png',
   'icons/icon-512.png',
@@ -29,12 +35,17 @@ const SHELL_ASSETS = [
   'icons/favicon.png',
 ];
 
+// Niente skipWaiting() qui: la versione nuova resta "in attesa" finche' non e'
+// l'utente a toccare "Aggiorna" nell'avviso, cosi' l'app non si ricarica da
+// sola mentre la si sta usando. Il messaggio arriva da js/pwa-shell.js.
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(SHELL_CACHE)
-      .then((cache) => cache.addAll(SHELL_ASSETS))
-      .then(() => self.skipWaiting())
+    caches.open(SHELL_CACHE).then((cache) => cache.addAll(SHELL_ASSETS))
   );
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {

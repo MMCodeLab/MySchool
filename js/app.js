@@ -2,7 +2,7 @@
 // window.Schola contiene gia' store, componenti, router e tutte le viste.
 (function () {
 
-const { applyTheme, icon, initRouter } = window.Schola;
+const { applyTheme, icon, initRouter, store, navigate } = window.Schola;
 
 // Tema applicato subito, prima del primo paint utile.
 applyTheme();
@@ -66,30 +66,19 @@ initRouter();
 
 if (window.Schola.checkDueReminders) window.Schola.checkDueReminders();
 
-// Il service worker richiede http/https: se la pagina e' aperta come file
-// locale (file://) semplicemente non si registra, senza errori bloccanti.
-const isLocalDev = ['localhost', '127.0.0.1'].includes(location.hostname);
-
-if ('serviceWorker' in navigator) {
-  if (isLocalDev) {
-    // In sviluppo locale il service worker fa piu' danni che altro: mette in
-    // cache i file e poi li riserve anche dopo che li hai modificati, dando
-    // l'impressione che le modifiche non vengano applicate. Lo disattiviamo
-    // e ripuliamo eventuali cache lasciate da una registrazione precedente,
-    // cosi' si vede sempre l'ultima versione dei file.
-    navigator.serviceWorker.getRegistrations().then((regs) => {
-      regs.forEach((reg) => reg.unregister());
-    });
-    if (window.caches) {
-      caches.keys().then((keys) => keys.forEach((key) => caches.delete(key)));
-    }
-  } else if (location.protocol.startsWith('http')) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch((err) => {
-        console.warn('Registrazione service worker fallita:', err);
-      });
-    });
-  }
+// Il guscio comune (js/pwa-shell.js) si occupa da solo del service worker,
+// dell'avviso di nuova versione e della barretta "sei offline". Qui gli si
+// dice soltanto come sono fatti i dati di questa app.
+if (window.PwaShell) {
+  window.PwaShell.configure({
+    // Senza dati non c'e' ancora niente da salvare, quindi il promemoria del
+    // backup non ha motivo di comparire.
+    hasData: () => {
+      const { subjects, tasks, grades, essays } = store.get();
+      return subjects.length > 0 || tasks.length > 0 || grades.length > 0 || essays.length > 0;
+    },
+    onBackupRequest: () => navigate('#/impostazioni'),
+  });
 }
 
 })();
