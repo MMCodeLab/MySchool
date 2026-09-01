@@ -1,7 +1,7 @@
 // Script classico (non un modulo ES): espone tutto su window.Schola.views.settings.
 (function () {
 
-const { store, icon, escapeHtml, showToast, confirmAction, openModal, closeModal } = window.Schola;
+const { store, icon, escapeHtml, showToast, openModal, closeModal } = window.Schola;
 
 // Il guscio comune tiene la data dell'ultimo backup: se per qualche motivo non
 // e' stato caricato, la riga mostra semplicemente il testo predefinito.
@@ -157,12 +157,6 @@ function render(container) {
         </div>
       </div>
       <input type="file" id="import-file" accept="application/json" style="display:none" />
-      <div class="settings-row glass" id="clear-row" style="cursor:pointer">
-        <div class="settings-row-text">
-          <div class="settings-row-title" style="color:var(--danger)">Cancella tutti i dati</div>
-          <div class="settings-row-desc">Elimina definitivamente tutti i dati salvati su questo dispositivo.</div>
-        </div>
-      </div>
     </div>
 
     <div class="settings-section">
@@ -280,18 +274,6 @@ function render(container) {
     fileInput.value = '';
   });
 
-  container.querySelector('#clear-row').addEventListener('click', () => {
-    confirmAction({
-      title: 'Cancellare tutti i dati?',
-      message: 'Questa azione eliminerà definitivamente tutti i dati salvati su questo dispositivo.',
-      confirmLabel: 'Cancella tutto',
-      onConfirm: () => {
-        store.clearAll();
-        showToast('Dati cancellati');
-        render(container);
-      },
-    });
-  });
 }
 
 window.Schola = window.Schola || {};
